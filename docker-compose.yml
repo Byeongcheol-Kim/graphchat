@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # FalkorDB (그래프 데이터베이스)
+  falkordb:
+    image: falkordb/falkordb:latest
+    container_name: branching-ai-falkordb
+    ports:
+      - "6380:6379"
+    volumes:
+      - falkordb_data:/data
+    networks:
+      - branching-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # 백엔드 (FastAPI)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: branching-ai-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - FALKORDB_HOST=falkordb
+      - FALKORDB_PORT=6379  # 컨테이너 내부 포트는 그대로 6379
+      - DEBUG=true
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      falkordb:
+        condition: service_healthy
+    networks:
+      - branching-network
+    command: uvicorn app.main:socket_app --host 0.0.0.0 --port 8000 --reload
+
+  # 프론트엔드 (React)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: branching-ai-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - branching-network
+    command: npm run dev -- --host
+
+networks:
+  branching-network:
+    driver: bridge
+
+volumes:
+  falkordb_data:
