@@ -1,8 +1,10 @@
 """
 WebSocket 관련 스키마
 """
-from typing import Any, Dict, Literal, Optional
-from pydantic import BaseModel, Field
+
+from typing import Any, Literal
+
+from pydantic import BaseModel
 
 WSMessageType = Literal[
     "chat",
@@ -17,13 +19,15 @@ WSMessageType = Literal[
 
 class WSMessage(BaseModel):
     """WebSocket 메시지 스키마"""
+
     type: WSMessageType
-    data: Dict[str, Any]
-    timestamp: Optional[str] = None
+    data: dict[str, Any]
+    timestamp: str | None = None
 
 
 class WSChatMessage(BaseModel):
     """WebSocket 채팅 메시지"""
+
     session_id: str
     node_id: str
     content: str
@@ -31,13 +35,15 @@ class WSChatMessage(BaseModel):
 
 class WSNodeUpdate(BaseModel):
     """WebSocket 노드 업데이트"""
+
     node_id: str
     session_id: str
     action: Literal["created", "updated", "deleted"]
-    node_data: Optional[Dict[str, Any]] = None
+    node_data: dict[str, Any] | None = None
 
 
 class WSError(BaseModel):
     """WebSocket 에러"""
+
     error: str
-    details: Optional[str] = None
+    details: str | None = None

@@ -1,28 +1,30 @@
 """
 Dependency Injection Container
 """
-from dependency_injector import containers, providers
+
 import logging
 
+from dependency_injector import containers, providers
+
+from backend.api.websocket.connection_manager import ConnectionManager
 from backend.core.config import Settings
 from backend.db.falkordb import FalkorDBManager
-from backend.services.session_service import SessionService
-from backend.services.node_service import NodeService
-from backend.services.message_service import MessageService
-from backend.services.chat_service import ChatService
 from backend.services.branching_service import BranchingService
+from backend.services.chat_service import ChatService
 from backend.services.gemini_service import GeminiService
-from backend.api.websocket.connection_manager import ConnectionManager
+from backend.services.message_service import MessageService
+from backend.services.node_service import NodeService
+from backend.services.session_service import SessionService
 
 logger = logging.getLogger(__name__)
 
 
 class Container(containers.DeclarativeContainer):
     """DI 컨테이너 - 모든 의존성 중앙 관리"""
-    
+
     # Configuration provider
     config = providers.Configuration()
-    
+
     # Database
     db_manager = providers.Singleton(
         FalkorDBManager,
@@ -30,32 +32,32 @@ class Container(containers.DeclarativeContainer):
         port=config.falkordb_port,
         graph_name=config.falkordb_graph,
     )
-    
-    # External Services  
+
+    # External Services
     gemini_service = providers.Singleton(
         GeminiService,
         api_key=config.google_api_key,
         model=config.gemini_model,
     )
-    
+
     # Business Services
     session_service = providers.Factory(
         SessionService,
         db=db_manager,
     )
-    
+
     message_service = providers.Factory(
         MessageService,
         db=db_manager,
     )
-    
+
     # BranchingService를 먼저 정의 (다른 서비스에 의존하지 않음)
     branching_service = providers.Factory(
         BranchingService,
         db=db_manager,
         gemini_service=gemini_service,
     )
-    
+
     # ChatService 정의 (BranchingService에 의존)
     chat_service = providers.Factory(
         ChatService,
@@ -63,7 +65,7 @@ class Container(containers.DeclarativeContainer):
         gemini_service=gemini_service,
         branching_service=branching_service,
     )
-    
+
     # NodeService 정의 (ChatService와 BranchingService에 의존)
     node_service = providers.Factory(
         NodeService,
@@ -71,7 +73,7 @@ class Container(containers.DeclarativeContainer):
         chat_service=chat_service,
         branching_service=branching_service,
     )
-    
+
     # WebSocket
     websocket_manager = providers.Singleton(ConnectionManager)
 

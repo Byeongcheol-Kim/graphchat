@@ -1,15 +1,16 @@
 """
 api/endpoints/nodes.py 테스트
 """
-import pytest
-from fastapi.testclient import TestClient
-from unittest.mock import Mock, AsyncMock
-from datetime import datetime
-from dependency_injector import providers
 
-from backend.main import app
+from datetime import datetime
+from unittest.mock import AsyncMock, Mock
+
+import pytest
+from dependency_injector import providers
+from fastapi.testclient import TestClient
+
 from backend.core.container import get_container
-from backend.schemas.node import Node, NodeCreate
+from backend.main import app
 
 
 @pytest.fixture
@@ -42,10 +43,10 @@ def client(mock_node_service, mock_message_service):
     container = get_container()
     container.node_service.override(providers.Object(mock_node_service))
     container.message_service.override(providers.Object(mock_message_service))
-    
+
     # 테스트 후 cleanup
     yield TestClient(app)
-    
+
     # Reset override
     container.node_service.reset_override()
     container.message_service.reset_override()
@@ -53,7 +54,7 @@ def client(mock_node_service, mock_message_service):
 
 class TestNodeEndpoints:
     """노드 엔드포인트 테스트"""
-    
+
     def test_create_node(self, client, mock_node_service):
         """노드 생성 엔드포인트 테스트"""
         # Given: 노드 생성 응답 설정
@@ -73,9 +74,9 @@ class TestNodeEndpoints:
             "metadata": {},
             "is_summary": False,
             "summary_content": None,
-            "source_node_ids": None
+            "source_node_ids": None,
         }
-        
+
         # When: 노드 생성 요청
         response = client.post(
             "/api/v1/nodes",
@@ -83,17 +84,17 @@ class TestNodeEndpoints:
                 "session_id": "session-123",
                 "title": "테스트 노드",
                 "type": "user",
-                "content": "테스트 내용"
-            }
+                "content": "테스트 내용",
+            },
         )
-        
+
         # Then: 생성 성공 확인
         assert response.status_code == 201
         data = response.json()
         assert data["id"] == "node-123"
         assert data["title"] == "테스트 노드"
         mock_node_service.create_node.assert_called_once()
-        
+
     def test_get_node(self, client, mock_node_service):
         """노드 조회 엔드포인트 테스트"""
         # Given: 노드 조회 응답 설정
@@ -113,25 +114,25 @@ class TestNodeEndpoints:
             "metadata": {},
             "is_summary": False,
             "summary_content": None,
-            "source_node_ids": None
+            "source_node_ids": None,
         }
-        
+
         # When: 노드 조회 요청
         response = client.get("/api/v1/nodes/node-123")
-        
+
         # Then: 조회 성공 확인
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == "node-123"
         assert data["token_count"] == 150
         mock_node_service.get_node.assert_called_once_with("node-123")
-        
+
     def test_get_node_with_messages(self, client, mock_node_service, mock_message_service):
         """메시지 포함 노드 조회 테스트"""
         # Given: 노드와 메시지 응답 설정
         created_at = datetime.now()
         msg_time = datetime.now()
-        
+
         mock_node_service.get_node.return_value = {
             "id": "node-123",
             "session_id": "session-123",
@@ -147,9 +148,9 @@ class TestNodeEndpoints:
             "metadata": {},
             "is_summary": False,
             "summary_content": None,
-            "source_node_ids": None
+            "source_node_ids": None,
         }
-        
+
         mock_message_service.get_messages_by_node.return_value = [
             {
                 "id": "msg-1",
@@ -157,7 +158,7 @@ class TestNodeEndpoints:
                 "role": "user",
                 "content": "안녕하세요",
                 "timestamp": msg_time,
-                "embedding": None
+                "embedding": None,
             },
             {
                 "id": "msg-2",
@@ -165,20 +166,20 @@ class TestNodeEndpoints:
                 "role": "assistant",
                 "content": "안녕하세요!",
                 "timestamp": msg_time,
-                "embedding": None
-            }
+                "embedding": None,
+            },
         ]
-        
+
         # When: 메시지 포함 노드 조회 요청
         response = client.get("/api/v1/nodes/node-123/with-messages")
-        
+
         # Then: 조회 성공 확인
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == "node-123"
         assert len(data["messages"]) == 2
         assert data["messages"][0]["content"] == "안녕하세요"
-        
+
     def test_get_node_tree(self, client, mock_node_service):
         """노드 트리 조회 테스트"""
         # Given: 트리 구조 응답 설정
@@ -199,7 +200,7 @@ class TestNodeEndpoints:
                 "metadata": {},
                 "is_summary": False,
                 "summary_content": None,
-                "source_node_ids": None
+                "source_node_ids": None,
             },
             "children": [
                 {
@@ -218,23 +219,23 @@ class TestNodeEndpoints:
                         "metadata": {},
                         "is_summary": False,
                         "summary_content": None,
-                        "source_node_ids": None
+                        "source_node_ids": None,
                     },
-                    "children": []
+                    "children": [],
                 }
-            ]
+            ],
         }
-        
+
         # When: 노드 트리 조회 요청
         response = client.get("/api/v1/nodes/node-root/tree")
-        
+
         # Then: 트리 조회 성공 확인
         assert response.status_code == 200
         data = response.json()
         assert data["node"]["id"] == "node-root"
         assert len(data["children"]) == 1
         assert data["children"][0]["node"]["id"] == "node-child"
-        
+
     def test_update_node(self, client, mock_node_service):
         """노드 수정 엔드포인트 테스트"""
         # Given: 노드 수정 응답 설정
@@ -255,42 +256,38 @@ class TestNodeEndpoints:
             "metadata": {"updated": True},
             "is_summary": False,
             "summary_content": None,
-            "source_node_ids": None
+            "source_node_ids": None,
         }
-        
+
         # When: 노드 수정 요청
         response = client.patch(
             "/api/v1/nodes/node-123",
-            json={
-                "title": "수정된 노드",
-                "is_active": False,
-                "metadata": {"updated": True}
-            }
+            json={"title": "수정된 노드", "is_active": False, "metadata": {"updated": True}},
         )
-        
+
         # Then: 수정 성공 확인
         assert response.status_code == 200
         data = response.json()
         assert data["title"] == "수정된 노드"
         assert data["is_active"] is False
-        
+
     def test_delete_node(self, client, mock_node_service):
         """노드 삭제 엔드포인트 테스트"""
         # Given: 삭제 성공 설정
         mock_node_service.delete_node.return_value = True
-        
+
         # When: 노드 삭제 요청
         response = client.delete("/api/v1/nodes/node-123")
-        
+
         # Then: 삭제 성공 확인
         assert response.status_code == 204
         mock_node_service.delete_node.assert_called_once_with("node-123")
-        
+
     def test_create_branch(self, client, mock_node_service):
         """브랜치 생성 엔드포인트 테스트"""
         # Given: 브랜치 생성 응답 설정
         created_at = datetime.now()
-        
+
         # parent 노드 조회 응답 설정
         mock_node_service.get_node.return_value = {
             "id": "node-parent",
@@ -307,9 +304,9 @@ class TestNodeEndpoints:
             "metadata": {},
             "is_summary": False,
             "summary_content": None,
-            "source_node_ids": None
+            "source_node_ids": None,
         }
-        
+
         # create_node 호출 시 반환값 설정
         mock_node_service.create_node.side_effect = [
             {
@@ -327,7 +324,7 @@ class TestNodeEndpoints:
                 "metadata": {},
                 "is_summary": False,
                 "summary_content": None,
-                "source_node_ids": None
+                "source_node_ids": None,
             },
             {
                 "id": "branch-2",
@@ -344,10 +341,10 @@ class TestNodeEndpoints:
                 "metadata": {},
                 "is_summary": False,
                 "summary_content": None,
-                "source_node_ids": None
-            }
+                "source_node_ids": None,
+            },
         ]
-        
+
         # When: 브랜치 생성 요청
         response = client.post(
             "/api/v1/nodes/branches",
@@ -355,18 +352,18 @@ class TestNodeEndpoints:
                 "parent_id": "node-parent",
                 "branches": [
                     {"title": "브랜치 1", "content": "브랜치 1 내용", "type": "branch"},
-                    {"title": "브랜치 2", "content": "브랜치 2 내용", "type": "branch"}
-                ]
-            }
+                    {"title": "브랜치 2", "content": "브랜치 2 내용", "type": "branch"},
+                ],
+            },
         )
-        
+
         # Then: 브랜치 생성 성공 확인
         assert response.status_code == 201
         data = response.json()
         assert len(data) == 2
         assert data[0]["title"] == "브랜치 1"
         assert data[1]["title"] == "브랜치 2"
-        
+
     def test_create_summary(self, client, mock_node_service):
         """요약 생성 엔드포인트 테스트"""
         # Given: 요약 생성 응답 설정
@@ -386,18 +383,15 @@ class TestNodeEndpoints:
             "metadata": {},
             "is_summary": True,
             "summary_content": "요약된 내용입니다",
-            "source_node_ids": ["node-1", "node-2", "node-3"]
+            "source_node_ids": ["node-1", "node-2", "node-3"],
         }
-        
+
         # When: 요약 생성 요청
         response = client.post(
             "/api/v1/nodes/summary",
-            json={
-                "node_ids": ["node-1", "node-2", "node-3"],
-                "is_manual": False
-            }
+            json={"node_ids": ["node-1", "node-2", "node-3"], "is_manual": False},
         )
-        
+
         # Then: 요약 생성 성공 확인
         assert response.status_code == 201
         data = response.json()
