@@ -8,22 +8,16 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Python 의존성 설치
+# UV 설치
+RUN pip install --no-cache-dir uv
+
+# 전체 프로젝트 복사 (pyproject.toml이 프로젝트 정의를 포함하므로)
 COPY pyproject.toml .
-COPY requirements.txt* .
+COPY uv.lock .
+COPY backend ./backend
 
-# requirements.txt가 있으면 pip로, 없으면 pyproject.toml 파싱해서 설치
-RUN if [ -f requirements.txt ]; then \
-        pip install --no-cache-dir -r requirements.txt; \
-    else \
-        pip install --no-cache-dir fastapi uvicorn pydantic pydantic-settings \
-        google-generativeai falkordb python-multipart \
-        websockets python-jose[cryptography] passlib bcrypt \
-        python-dotenv httpx; \
-    fi
-
-# 소스 코드 복사
-COPY . .
+# UV로 현재 프로젝트를 editable 모드로 설치
+RUN uv pip install --system -e .
 
 # 포트 노출
 EXPOSE 8432
@@ -33,4 +27,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8432/health || exit 1
 
 # 서버 실행
-CMD ["python", "main.py"]
+CMD ["python", "-m", "backend.main"]

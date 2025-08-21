@@ -22,8 +22,8 @@ services:
   # 백엔드 서버
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./backend/Dockerfile
     container_name: graphchat-backend
     ports:
       - "8432:8432"
@@ -46,8 +46,8 @@ services:
     networks:
       - graphchat-network
     volumes:
-      - ./backend:/app
-    command: python main.py
+      - ./backend:/app/backend
+    command: python backend/main.py
 
   # 프론트엔드 서버
   frontend:
