@@ -10,24 +10,33 @@ import ExploreIcon from '@mui/icons-material/Explore'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import PauseCircleIcon from '@mui/icons-material/PauseCircle'
 import PlayCircleIcon from '@mui/icons-material/PlayCircle'
+import HomeIcon from '@mui/icons-material/Home'
+import MergeTypeIcon from '@mui/icons-material/MergeType'
+import LinkIcon from '@mui/icons-material/Link'
 
 interface BranchNodeData {
   label: string
-  type: 'main' | 'topic' | 'exploration' | 'question' | 'solution'
+  type: 'root' | 'main' | 'topic' | 'exploration' | 'question' | 'solution' | 'summary' | 'reference'
   status: 'active' | 'paused' | 'completed'
   messageCount: number
   depth: number
   description?: string
   isAncestor?: boolean
+  isSummary?: boolean
+  isReference?: boolean
+  sourceNodeIds?: string[]
 }
 
 const getTypeIcon = (type: string) => {
   switch (type) {
+    case 'root': return <HomeIcon />
     case 'main': return <AccountTreeIcon />
     case 'topic': return <AutoGraphIcon />
     case 'exploration': return <ExploreIcon />
     case 'question': return <QuestionMarkIcon />
     case 'solution': return <LightbulbIcon />
+    case 'summary': return <MergeTypeIcon />
+    case 'reference': return <LinkIcon />
     default: return <ChatBubbleOutlineIcon />
   }
 }
@@ -43,11 +52,14 @@ const getStatusIcon = (status: string) => {
 
 const getNodeColor = (type: string) => {
   switch (type) {
+    case 'root': return 'linear-gradient(135deg, #94a3b8 0%, #64748b 100%)'
     case 'main': return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
     case 'topic': return 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
     case 'exploration': return 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'
     case 'question': return 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)'
     case 'solution': return 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)'
+    case 'summary': return 'linear-gradient(135deg, #e91e63 0%, #c2185b 100%)'
+    case 'reference': return 'linear-gradient(135deg, #9333ea 0%, #7c3aed 100%)'
     default: return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
   }
 }

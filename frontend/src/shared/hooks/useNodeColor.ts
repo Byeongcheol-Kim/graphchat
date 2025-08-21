@@ -1,6 +1,7 @@
-import { getNodeTypeColor } from '@shared/theme/colors'
+import { useThemeColor } from './useThemeColor'
 
 export const useNodeColor = (type?: string) => {
+  const { getNodeTypeColor } = useThemeColor()
   const color = getNodeTypeColor(type)
   
   return {

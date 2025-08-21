@@ -17,13 +17,13 @@ import {
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import EditNoteIcon from '@mui/icons-material/EditNote'
 import { borderRadius, uiColors } from '@shared/theme'
-import { Branch } from '@store/conversationStore'
+import { Node } from '@/types'
 
 interface SummaryDialogProps {
   open: boolean
   onClose: () => void
   selectedNodes: string[]
-  branches: Branch[]
+  branches: Node[]
   onCreateSummary: (nodeIds: string[], instructions?: string) => void
 }
 

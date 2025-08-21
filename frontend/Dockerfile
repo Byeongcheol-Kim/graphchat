@@ -12,7 +12,7 @@ RUN npm install
 COPY . .
 
 # 포트 노출
-EXPOSE 3000
+EXPOSE 3432
 
 # 개발 서버 실행
 CMD ["npm", "run", "dev", "--", "--host"]

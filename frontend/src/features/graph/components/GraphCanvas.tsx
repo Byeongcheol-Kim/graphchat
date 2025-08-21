@@ -16,28 +16,21 @@ import {
   ConnectionLineType,
   ReactFlowInstance,
 } from '@xyflow/react'
-import dagre from 'dagre'
 import '@xyflow/react/dist/style.css'
-import { Box, Typography, IconButton, Tooltip, TextField, Divider } from '@mui/material'
-import AddIcon from '@mui/icons-material/Add'
-import RestartAltIcon from '@mui/icons-material/RestartAlt'
-import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore'
-import UnfoldLessIcon from '@mui/icons-material/UnfoldLess'
-import UndoIcon from '@mui/icons-material/Undo'
-import RedoIcon from '@mui/icons-material/Redo'
-import EditIcon from '@mui/icons-material/Edit'
-import CheckIcon from '@mui/icons-material/Check'
-import CloseIcon from '@mui/icons-material/Close'
+import { Box } from '@mui/material'
 import { useConversationStore } from '@store/conversationStore'
-import { nodeTypeColors, uiColors } from '@shared/theme'
-import { StyledButton, StyledPanel, StyledChip } from '@shared/components'
+import { uiColors } from '@shared/theme'
+import { colorThemes } from '@shared/theme/colors'
+import { useThemeColor } from '@shared/hooks/useThemeColor'
 import EnhancedNode from './EnhancedNode'
 import ContextMenu from './ContextMenu'
 import SimpleEdgeLabel from './SimpleEdgeLabel'
 import SummaryDialog from './SummaryDialog'
-import SettingsMenu from './SettingsMenu'
 import LeafNodesDashboard from './LeafNodesDashboard'
 import DeleteConfirmDialog from './DeleteConfirmDialog'
+import GraphToolbar from './GraphToolbar'
+import { getLayoutedElements } from '../utils/graphLayout'
+import { useWebSocketEvents } from '@/hooks/useWebSocketEvents'
 
 // 노드 타입 정의
 const nodeTypes = {
@@ -49,61 +42,47 @@ const edgeTypes = {
   labeled: SimpleEdgeLabel,
 }
 
-// dagre 그래프 설정
-const dagreGraph = new dagre.graphlib.Graph()
-dagreGraph.setDefaultEdgeLabel(() => ({}))
-
-// 레이아웃 계산 함수
-const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'TB', isExpanded = false) => {
-  // 확장 상태에 따라 노드 크기를 다르게 설정
-  const nodeWidth = isExpanded ? 280 : 200
-  const nodeHeight = isExpanded ? 150 : 100
-  
-  // 확장 시 노드 간격도 늘림
-  const rankSeparation = isExpanded ? 150 : 100
-  const nodeSeparation = isExpanded ? 100 : 60
-
-  dagreGraph.setGraph({ rankdir: direction, ranksep: rankSeparation, nodesep: nodeSeparation })
-
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight })
-  })
-
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target)
-  })
-
-  dagre.layout(dagreGraph)
-
-  const layoutedNodes = nodes.map((node) => {
-    const nodeWithPosition = dagreGraph.node(node.id)
-    return {
-      ...node,
-      position: {
-        x: nodeWithPosition.x - nodeWidth / 2,
-        y: nodeWithPosition.y - nodeHeight / 2,
-      },
-    }
-  })
-
-  return { nodes: layoutedNodes, edges }
-}
-
 const GraphCanvas: React.FC = () => {
-  const { branches, currentBranchId, switchBranch, initializeWithDummyData, createNewSession, createSummaryNode, createReferenceNode, deleteNodes, undo, redo, canUndo, canRedo, edgeLabels, updateEdgeLabel, sessionName, updateSessionName } = useConversationStore()
+  const { branches, currentBranchId, switchBranch, createNewSession, createIndependentNode, createSummaryNode, createReferenceNode, deleteNodes, undo, redo, canUndo, canRedo, edgeLabels, updateEdgeLabel, sessionName, updateSessionName, settings } = useConversationStore()
+  const { getNodeTypeColor, colorTheme } = useThemeColor()
   const [nodes, setNodes, onNodesChange] = useNodesState<Node[]>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([])
   const [globalExpanded, setGlobalExpanded] = React.useState(false)
+  
+  // WebSocket 이벤트 처리 (노드 삭제 등)
+  useWebSocketEvents(currentBranchId)
   const [individualExpandedNodes, setIndividualExpandedNodes] = React.useState<Set<string>>(new Set())
   const [selectedNodes, setSelectedNodes] = React.useState<string[]>([])
   const [contextMenuPosition, setContextMenuPosition] = React.useState<{ x: number; y: number } | null>(null)
   const graphContainerRef = useRef<HTMLDivElement>(null)
   const [reactFlowInstance, setReactFlowInstance] = React.useState<ReactFlowInstance | null>(null)
-  const [isEditingName, setIsEditingName] = useState(false)
-  const [tempSessionName, setTempSessionName] = useState(sessionName)
   const [summaryDialogOpen, setSummaryDialogOpen] = useState(false)
   const [deleteConfirmDialogOpen, setDeleteConfirmDialogOpen] = useState(false)
   const [nodesToDelete, setNodesToDelete] = useState<string[]>([])
+  const [sessionPanelCollapsed, setSessionPanelCollapsed] = useState(false)
+  
+  // 강제 리렌더링을 위한 forceUpdate
+  const [, forceUpdate] = React.useReducer(x => x + 1, 0)
+  
+  // 리프 노드 계산 (자식이 없고 완료되지 않은 노드)
+  const leafNodesCount = React.useMemo(() => {
+    const hasChildren = new Set<string>()
+    branches.forEach(branch => {
+      // 일반 부모 체크 (parentId 또는 parent_id)
+      const parentId = branch.parentId || (branch as any).parent_id
+      if (parentId) hasChildren.add(parentId)
+      // 요약 노드의 소스들 체크 (sourceNodeIds 또는 source_node_ids)
+      const sourceIds = branch.sourceNodeIds || (branch as any).source_node_ids || (branch as any).parentIds
+      if (sourceIds) {
+        sourceIds.forEach((id: string) => hasChildren.add(id))
+      }
+    })
+    
+    return branches.filter(branch => 
+      !hasChildren.has(branch.id) && 
+      branch.status !== 'completed'
+    ).length
+  }, [branches])
 
   // 개별 노드 확장 토글 핸들러
   const handleNodeExpand = useCallback((nodeId: string, expanded: boolean) => {
@@ -118,20 +97,35 @@ const GraphCanvas: React.FC = () => {
     })
   }, [])
 
-  // 초기 더미 데이터 로드
-  useEffect(() => {
-    initializeWithDummyData()
-  }, [])
+  // 초기 데이터는 App.tsx에서 세션 생성 후 로드됨
+  // useEffect(() => {
+  //   initializeWithDummyData()
+  // }, [])
 
+  // 이전 브랜치 개수를 추적하기 위한 ref
+  const prevBranchCountRef = useRef(branches.length)
+  
   // 브랜치 데이터를 React Flow 노드/엣지로 변환
   useEffect(() => {
-    if (branches.length === 0) return
+    console.log('[GraphCanvas] branches 업데이트 감지, 개수:', branches.length)
+    console.log('[GraphCanvas] branches:', branches.map(b => ({ id: b.id, title: b.title, parentId: b.parentId })))
     
-    // 현재 선택된 노드가 머지 노드인지 확인하고 관련 노드 찾기
-    const currentBranch = branches.find(b => b.id === currentBranchId)
+    if (branches.length === 0) {
+      // 노드가 모두 삭제된 경우 빈 그래프 표시
+      setNodes([])
+      setEdges([])
+      return
+    }
+    
+    // 현재 선택된 노드가 유효한지 확인
+    const validCurrentBranchId = branches.find(b => b.id === currentBranchId) ? currentBranchId : null
+    
+    // 현재 선택된 노드가 요약 노드인지 확인하고 관련 노드 찾기
+    const currentBranch = validCurrentBranchId ? branches.find(b => b.id === validCurrentBranchId) : null
     const relatedNodeIds = new Set<string>()
-    if (currentBranch?.isMerge && currentBranch.parentIds) {
-      currentBranch.parentIds.forEach(id => relatedNodeIds.add(id))
+    const sourceIds = (currentBranch as any)?.sourceNodeIds || (currentBranch as any)?.parentIds
+    if (((currentBranch as any)?.isSummary || (currentBranch as any)?.isMerge) && sourceIds) {
+      sourceIds.forEach(id => relatedNodeIds.add(id))
     }
 
     // 노드 생성
@@ -143,13 +137,13 @@ const GraphCanvas: React.FC = () => {
         label: branch.title,
         type: branch.type,
         status: branch.status,
-        messageCount: branch.messages.length,
-        tokenCount: branch.tokenCount,
-        summary: branch.summary,
+        messageCount: branch.messages?.length || 0,  // undefined 체크 추가
+        tokenCount: branch.tokenCount || 0,  // undefined 체크 추가
+        summary: branch.summary || (branch as any).summaryContent || (branch as any).metadata?.summary,
         keyPoints: branch.keyPoints,
         charts: branch.charts,
-        isMerge: branch.isMerge || false,
-        parentIds: branch.parentIds,
+        isMerge: (branch as any).isMerge || (branch as any).isSummary || false,
+        parentIds: (branch as any).parentIds || (branch as any).sourceNodeIds,
         globalExpanded,
         isIndividualExpanded: individualExpandedNodes.has(branch.id),
         isRelatedToSelectedMerge: relatedNodeIds.has(branch.id),
@@ -160,24 +154,67 @@ const GraphCanvas: React.FC = () => {
     // 엣지 생성
     const initialEdges: Edge[] = []
     
+    console.log('[GraphCanvas] 엣지 생성 시작, branches:', branches.map(b => ({
+      id: b.id,
+      parentId: b.parentId,
+      sourceNodeIds: (b as any).sourceNodeIds,
+      parentIds: (b as any).parentIds
+    })))
+    
     branches.forEach(branch => {
-      // 머지 노드의 경우 여러 부모로부터 엣지 생성
-      if (branch.parentIds && branch.parentIds.length > 0) {
-        branch.parentIds.forEach(parentId => {
-          const edgeId = `${parentId}-${branch.id}`
-          const parentBranch = branches.find(b => b.id === parentId)
+      // 요약 노드의 경우 여러 소스 노드로부터 엣지 생성
+      // parentIds (legacy) 또는 sourceNodeIds (new) 체크
+      const sourceIds = (branch as any).sourceNodeIds || (branch as any).parentIds || (branch as any).source_node_ids
+      
+      // 디버깅: 요약/참조 노드 확인
+      if ((branch as any).isSummary || (branch as any).isReference || branch.type === 'summary' || branch.type === 'reference') {
+        console.log(`[GraphCanvas] 요약/참조 노드 발견: ${branch.id}`, {
+          type: branch.type,
+          isSummary: (branch as any).isSummary,
+          isReference: (branch as any).isReference,
+          sourceNodeIds: (branch as any).sourceNodeIds,
+          source_node_ids: (branch as any).source_node_ids,
+          parentIds: (branch as any).parentIds,
+          parentId: branch.parentId
+        })
+      }
+      
+      if (sourceIds && sourceIds.length > 0) {
+        const isSummary = (branch as any).isSummary || branch.type === 'summary'
+        const isReference = (branch as any).isReference || branch.type === 'reference'
+        
+        sourceIds.forEach(sourceId => {
+          const edgeId = `${sourceId}-${branch.id}`
+          const sourceBranch = branches.find(b => b.id === sourceId)
+          console.log(`[GraphCanvas] ${isSummary ? '요약' : isReference ? '참조' : '일반'} 노드 엣지 생성: ${sourceId} -> ${branch.id}`)
           initialEdges.push({
             id: edgeId,
-            source: parentId,
+            source: sourceId,
             target: branch.id,
             type: 'labeled',
-            animated: false,
+            animated: false,  // 기본적으로 애니메이션 없음
+            style: isSummary ? {
+              stroke: '#DC7F50',  // 차분한 주황색 (요약)
+              strokeWidth: 2,
+              strokeDasharray: '8 4',  // 더 뚜렷한 점선
+            } : isReference ? {
+              stroke: '#5C9EAD',  // 차분한 청록색 (참조)
+              strokeWidth: 2,
+              strokeDasharray: '3 3',  // 짧은 점선
+            } : undefined,
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              width: 15,
+              height: 15,
+              color: isSummary ? '#DC7F50' : isReference ? '#5C9EAD' : '#94a3b8',
+            },
             data: {
-              label: edgeLabels[edgeId] || '',
+              label: isSummary ? '요약' : isReference ? '참조' : edgeLabels[edgeId] || '',
               metadata: {
                 createdAt: branch.createdAt,
-                messageCount: branch.messages.length,
-                reason: branch.isMerge ? '브랜치 통합' : undefined,
+                messageCount: branch.messages?.length || 0,
+                reason: isSummary ? '노드 요약' : isReference ? '노드 참조' : undefined,
+                edgeType: isSummary ? 'summary' : isReference ? 'reference' : 'normal',
               },
               onLabelChange: updateEdgeLabel,
             },
@@ -187,6 +224,7 @@ const GraphCanvas: React.FC = () => {
       // 일반 노드의 경우 단일 부모로부터 엣지 생성
       else if (branch.parentId) {
         const edgeId = `${branch.parentId}-${branch.id}`
+        console.log(`[GraphCanvas] 일반 노드 엣지 생성: ${branch.parentId} -> ${branch.id}`)
         initialEdges.push({
           id: edgeId,
           source: branch.parentId,
@@ -197,13 +235,17 @@ const GraphCanvas: React.FC = () => {
             label: edgeLabels[edgeId] || '',
             metadata: {
               createdAt: branch.createdAt,
-              messageCount: branch.messages.length,
+              messageCount: branch.messages?.length ?? 0,
             },
             onLabelChange: updateEdgeLabel,
           },
         })
+      } else {
+        console.log(`[GraphCanvas] 엣지 생성 실패 - parentId 없음: ${branch.id}`)
       }
     })
+    
+    console.log('[GraphCanvas] 생성된 엣지 수:', initialEdges.length, initialEdges)
 
     // dagre 레이아웃 적용 - 확장 상태 전달
     // 하나라도 확장된 노드가 있으면 레이아웃을 확장 모드로 계산
@@ -219,20 +261,23 @@ const GraphCanvas: React.FC = () => {
     setEdges(layoutedEdges)
     
     // 새 노드가 생성되면 해당 노드로 포커스 이동
-    // 브랜치 수가 변경되었을 때만 실행
-    if (reactFlowInstance && currentBranchId) {
+    // 브랜치 수가 증가했을 때만 실행
+    if (reactFlowInstance && currentBranchId && branches.length > prevBranchCountRef.current) {
       const currentNode = layoutedNodes.find(n => n.id === currentBranchId)
       if (currentNode) {
-        // fitView를 먼저 실행한 후 센터로 이동
-        reactFlowInstance.fitView({ padding: 0.2, duration: 400 })
+        // 새 노드 생성 시에만 fitView 후 센터 이동
+        reactFlowInstance.fitView({ padding: 0.2, duration: 200 })
         setTimeout(() => {
           reactFlowInstance.setCenter(currentNode.position.x + 100, currentNode.position.y + 50, {
-            duration: 800,
+            duration: 300,
             zoom: 1,
           })
-        }, 500)
+        }, 250)
       }
     }
+    
+    // 브랜치 개수 업데이트
+    prevBranchCountRef.current = branches.length
   }, [branches, currentBranchId, globalExpanded, individualExpandedNodes, handleNodeExpand, setNodes, setEdges, reactFlowInstance, edgeLabels, updateEdgeLabel])
 
   // 노드 클릭 핸들러
@@ -250,9 +295,20 @@ const GraphCanvas: React.FC = () => {
         // 단일 선택
         setSelectedNodes([node.id])
         switchBranch(node.id)
+        
+        // 기존 노드 선택 시 빠른 포커스 이동 (애니메이션 최소화)
+        if (reactFlowInstance) {
+          const targetNode = nodes.find(n => n.id === node.id)
+          if (targetNode) {
+            reactFlowInstance.setCenter(targetNode.position.x + 100, targetNode.position.y + 50, {
+              duration: 200,
+              zoom: reactFlowInstance.getZoom(),
+            })
+          }
+        }
       }
     },
-    [switchBranch]
+    [switchBranch, reactFlowInstance, nodes]
   )
   
   // 우클릭 핸들러
@@ -277,42 +333,50 @@ const GraphCanvas: React.FC = () => {
     setContextMenuPosition(null)
   }, [])
   
-  // 배경 우클릭 핸들러
+  // 배경 우클릭 핸들러 - 새 독립 노드 생성
   const onPaneContextMenu = useCallback((event: React.MouseEvent) => {
     event.preventDefault()
-    setContextMenuPosition(null)
+    
+    // 컨텍스트 메뉴 위치 설정 (새 노드 생성용)
+    setContextMenuPosition({ x: event.clientX, y: event.clientY })
+    setSelectedNodes([]) // 선택된 노드 초기화
   }, [])
   
   // 요약 노드 생성 핸들러
-  const handleCreateSummary = useCallback((nodeIds?: string[], instructions?: string) => {
+  const handleCreateSummary = useCallback(async (nodeIds?: string[], instructions?: string) => {
     const targetNodes = nodeIds || selectedNodes
     if (targetNodes.length > 1) {
+      let summaryNodeId: string | null = null
       if (instructions) {
         // 지침 기반 요약
-        const summaryNodeId = createSummaryNode(targetNodes, instructions)
-        if (summaryNodeId) {
-          // 생성된 노드로 포커스
-          setTimeout(() => {
-            if (reactFlowInstance) {
-              const node = nodes.find(n => n.id === summaryNodeId)
-              if (node) {
-                reactFlowInstance.setCenter(node.position.x + 100, node.position.y + 50, {
-                  duration: 800,
-                  zoom: 1,
-                })
-              }
-            }
-          }, 100)
-        }
+        summaryNodeId = await createSummaryNode(targetNodes, instructions)
       } else {
         // 자동 요약
-        createSummaryNode(targetNodes)
+        summaryNodeId = await createSummaryNode(targetNodes)
+      }
+      
+      if (summaryNodeId) {
+        // 생성된 노드로 전환
+        await switchBranch(summaryNodeId)
+        
+        // 생성된 노드로 빠른 포커스
+        setTimeout(() => {
+          if (reactFlowInstance) {
+            const node = nodes.find(n => n.id === summaryNodeId)
+            if (node) {
+              reactFlowInstance.setCenter(node.position.x + 100, node.position.y + 50, {
+                duration: 300,
+                zoom: 1,
+              })
+            }
+          }
+        }, 50)
       }
       setSelectedNodes([])
     }
     setContextMenuPosition(null)
     setSummaryDialogOpen(false)
-  }, [selectedNodes, createSummaryNode, reactFlowInstance, nodes])
+  }, [selectedNodes, createSummaryNode, switchBranch, reactFlowInstance, nodes])
   
   // 요약 다이얼로그 열기
   const handleOpenSummaryDialog = useCallback(() => {
@@ -323,80 +387,101 @@ const GraphCanvas: React.FC = () => {
   }, [selectedNodes])
   
   // 참조 노드 생성 핸들러
-  const handleCreateReference = useCallback(() => {
+  const handleCreateReference = useCallback(async () => {
     if (selectedNodes.length > 0) {
+      let referenceNodeId: string | null = null
+      
       // 3개 이상의 노드를 참조할 경우 자동으로 요약 노드 생성
       if (selectedNodes.length >= 3) {
-        const summaryNodeId = createSummaryNode(selectedNodes)
-        if (summaryNodeId) {
-          createReferenceNode([summaryNodeId])
+        if (typeof createSummaryNode === 'function') {
+          const summaryNodeId = await createSummaryNode(selectedNodes)
+          if (summaryNodeId && typeof createReferenceNode === 'function') {
+            referenceNodeId = await createReferenceNode([summaryNodeId])
+          }
         }
       } else {
-        createReferenceNode(selectedNodes)
+        if (typeof createReferenceNode === 'function') {
+          referenceNodeId = await createReferenceNode(selectedNodes)
+        } else {
+          console.error('[GraphCanvas] createReferenceNode is not a function')
+        }
       }
+      
+      if (referenceNodeId) {
+        // 생성된 참조 노드로 전환
+        await switchBranch(referenceNodeId)
+      }
+      
       setSelectedNodes([])
     }
     setContextMenuPosition(null)
-  }, [selectedNodes, createSummaryNode, createReferenceNode])
+  }, [selectedNodes, createSummaryNode, createReferenceNode, switchBranch])
   
   // 노드 삭제 핸들러
-  const handleDeleteNodes = useCallback(() => {
+  const handleDeleteNodes = useCallback(async () => {
     if (selectedNodes.length > 0) {
+      // 유효한 노드만 필터링
+      const validNodes = selectedNodes.filter(nodeId => 
+        branches.some(b => b.id === nodeId)
+      )
+      
+      if (validNodes.length === 0) {
+        setSelectedNodes([])
+        setContextMenuPosition(null)
+        return
+      }
+      
       // 선택된 노드들 중 자식이 있는 노드가 있는지 확인
-      const hasChildrenNodes = selectedNodes.filter(nodeId => {
-        return branches.some(b => 
-          b.parentId === nodeId || b.parentIds?.includes(nodeId)
-        )
+      const hasChildrenNodes = validNodes.filter(nodeId => {
+        return branches.some(b => {
+          // 일반 부모 체크
+          if (b.parentId === nodeId) return true
+          // 요약 노드의 소스 체크
+          const sourceIds = (b as any).sourceNodeIds || (b as any).parentIds
+          if (sourceIds?.includes(nodeId)) return true
+          return false
+        })
       })
       
       if (hasChildrenNodes.length > 0) {
         // 자식이 있는 노드가 있으면 확인 다이얼로그 표시
-        setNodesToDelete(selectedNodes)
+        setNodesToDelete(validNodes)
         setDeleteConfirmDialogOpen(true)
       } else {
-        // 자식이 없으면 바로 삭제
-        deleteNodes(selectedNodes)
+        // 자식이 없으면 바로 삭제 (하위 노드 포함 안 함)
+        await deleteNodes(validNodes, false)
         setSelectedNodes([])
+        // 삭제된 노드가 개별 확장 목록에 있다면 제거
+        setIndividualExpandedNodes(prev => {
+          const newSet = new Set(prev)
+          validNodes.forEach(id => newSet.delete(id))
+          return newSet
+        })
+        // 강제 리렌더링을 위한 트리거
+        forceUpdate()
       }
     }
     setContextMenuPosition(null)
   }, [selectedNodes, deleteNodes, branches])
   
   // 삭제 확인 후 실제 삭제 실행
-  const handleConfirmDelete = useCallback(() => {
+  const handleConfirmDelete = useCallback(async (includeDescendants: boolean) => {
     if (nodesToDelete.length > 0) {
-      // 선택된 노드들과 모든 자손들을 찾아서 삭제
-      const allNodesToDelete = new Set<string>()
-      
-      const getDescendants = (nodeId: string) => {
-        const queue = [nodeId]
-        while (queue.length > 0) {
-          const currentId = queue.shift()!
-          allNodesToDelete.add(currentId)
-          
-          // 현재 노드의 자식들 찾기
-          const children = branches.filter(b => 
-            b.parentId === currentId || b.parentIds?.includes(currentId)
-          )
-          
-          children.forEach(child => {
-            if (!allNodesToDelete.has(child.id)) {
-              queue.push(child.id)
-            }
-          })
-        }
-      }
-      
-      // 각 선택된 노드와 그 자손들을 모두 찾기
-      nodesToDelete.forEach(nodeId => getDescendants(nodeId))
-      
-      // 모든 노드 삭제
-      deleteNodes(Array.from(allNodesToDelete))
+      // 새로운 API를 사용하여 삭제
+      await deleteNodes(nodesToDelete, includeDescendants)
       setSelectedNodes([])
       setNodesToDelete([])
+      // 삭제된 노드가 개별 확장 목록에 있다면 제거
+      setIndividualExpandedNodes(prev => {
+        const newSet = new Set(prev)
+        nodesToDelete.forEach(id => newSet.delete(id))
+        return newSet
+      })
+      // 강제 리렌더링을 위한 트리거
+      forceUpdate()
     }
     setDeleteConfirmDialogOpen(false)
-  }, [nodesToDelete, deleteNodes, branches])
+  }, [nodesToDelete, deleteNodes])
   
   // 키보드 단축키 핸들러
   useEffect(() => {
@@ -481,21 +566,36 @@ const GraphCanvas: React.FC = () => {
       eds.map((edge) => {
         const isInPath = ancestorIds.has(edge.source) && ancestorIds.has(edge.target)
         const targetBranch = branches.find(b => b.id === edge.target)
-        const isMergeEdge = targetBranch?.parentIds && targetBranch.parentIds.length > 1
+        const sourceIds = (targetBranch as any)?.sourceNodeIds || (targetBranch as any)?.parentIds
+        const isSummaryEdge = (targetBranch as any)?.isSummary || targetBranch?.type === 'summary'
+        const isReferenceEdge = (targetBranch as any)?.isReference || targetBranch?.type === 'reference'
+        
+        // 선택된 노드와 직접 연결된 엣지인지 확인
+        const isDirectlyConnected = edge.source === currentBranchId || edge.target === currentBranchId
+        
+        // 엣지의 기본 스타일 유지하면서 경로 강조
+        let strokeColor = '#94a3b8'
+        if (isSummaryEdge) {
+          strokeColor = isInPath ? '#E89B6F' : '#DC7F50' // 경로상에서 약간 더 밝은 주황색
+        } else if (isReferenceEdge) {
+          strokeColor = isInPath ? '#6FB1C1' : '#5C9EAD' // 경로상에서 약간 더 밝은 청록색
+        } else if (isInPath) {
+          strokeColor = '#6366f1' // 일반 경로는 보라색
+        }
         
         return {
           ...edge,
-          animated: isInPath,
+          animated: isDirectlyConnected, // 선택된 노드와 직접 연결된 엣지만 애니메이션
           style: {
-            strokeWidth: isInPath ? 2 : 1.5,
-            stroke: isInPath ? '#6366f1' : '#94a3b8',
-            strokeDasharray: isMergeEdge ? '5 5' : undefined,
+            strokeWidth: isSummaryEdge || isReferenceEdge ? 2 : isInPath ? 2 : 1.5,
+            stroke: strokeColor,
+            strokeDasharray: isSummaryEdge ? '8 4' : isReferenceEdge ? '3 3' : undefined,
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
             width: 15,
             height: 15,
-            color: isInPath ? '#6366f1' : '#94a3b8',
+            color: strokeColor,
           },
         }
       })
@@ -543,7 +643,7 @@ const GraphCanvas: React.FC = () => {
         
         <MiniMap
           nodeColor={(node) => {
-            return nodeTypeColors[node.data?.type as keyof typeof nodeTypeColors] || nodeTypeColors.default
+            return getNodeTypeColor(node.data?.type)
           }}
           style={{
             backgroundColor: 'rgba(255, 255, 255, 0.8)',
@@ -552,166 +652,34 @@ const GraphCanvas: React.FC = () => {
           maskColor="rgb(50, 50, 50, 0.1)"
         />
         
-        <Panel position="top-left">
-          <StyledPanel sx={{ p: 1.5, minWidth: 200 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
-              {isEditingName ? (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <TextField
-                    value={tempSessionName}
-                    onChange={(e) => setTempSessionName(e.target.value)}
-                    size="small"
-                    autoFocus
-                    variant="standard"
-                    sx={{
-                      '& .MuiInputBase-input': {
-                        fontSize: '0.875rem',
-                        fontWeight: 600,
-                        color: uiColors.textPrimary,
-                      },
-                    }}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        updateSessionName(tempSessionName)
-                        setIsEditingName(false)
-                      }
-                    }}
-                  />
-                  <IconButton
-                    size="small"
-                    onClick={() => {
-                      updateSessionName(tempSessionName)
-                      setIsEditingName(false)
-                    }}
-                    sx={{ p: 0.25 }}
-                  >
-                    <CheckIcon sx={{ fontSize: 16 }} />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    onClick={() => {
-                      setTempSessionName(sessionName)
-                      setIsEditingName(false)
-                    }}
-                    sx={{ p: 0.25 }}
-                  >
-                    <CloseIcon sx={{ fontSize: 16 }} />
-                  </IconButton>
-                </Box>
-              ) : (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Typography variant="subtitle2" sx={{ color: uiColors.textPrimary, fontWeight: 600 }}>
-                    {sessionName}
-                  </Typography>
-                  <IconButton
-                    size="small"
-                    onClick={() => {
-                      setTempSessionName(sessionName)
-                      setIsEditingName(true)
-                    }}
-                    sx={{ p: 0.25 }}
-                  >
-                    <EditIcon sx={{ fontSize: 14 }} />
-                  </IconButton>
-                </Box>
-              )}
-              <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-                <SettingsMenu />
-                <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-                <Tooltip title="실행 취소 (Ctrl+Z)">
-                  <span>
-                    <IconButton 
-                      size="small" 
-                      onClick={undo}
-                      disabled={!canUndo()}
-                      sx={{ p: 0.5 }}
-                    >
-                      <UndoIcon fontSize="small" />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-                <Tooltip title="다시 실행 (Ctrl+Shift+Z)">
-                  <span>
-                    <IconButton 
-                      size="small" 
-                      onClick={redo}
-                      disabled={!canRedo()}
-                      sx={{ p: 0.5 }}
-                    >
-                      <RedoIcon fontSize="small" />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-                <Tooltip title={globalExpanded ? "전체 축소" : "전체 확장"}>
-                  <IconButton 
-                    size="small" 
-                    onClick={() => setGlobalExpanded(!globalExpanded)}
-                    sx={{ p: 0.5 }}
-                  >
-                    {globalExpanded ? <UnfoldLessIcon fontSize="small" /> : <UnfoldMoreIcon fontSize="small" />}
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', gap: 0.5, mb: 1 }}>
-              <StyledButton
-                size="small"
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={createNewSession}
-                sx={{ fontSize: '11px', py: 0.5, px: 1.5 }}
-              >
-                새 세션
-              </StyledButton>
-              <StyledButton
-                size="small"
-                variant="outlined"
-                startIcon={<RestartAltIcon />}
-                onClick={initializeWithDummyData}
-                sx={{ fontSize: '11px', py: 0.5, px: 1.5 }}
-              >
-                예제
-              </StyledButton>
-            </Box>
-            <Box sx={{ display: 'flex', gap: 0.5 }}>
-              <StyledChip 
-                size="small" 
-                label={`노드: ${nodes.length}`}
-                sx={{ 
-                  backgroundColor: '#f0f0f0',
-                  color: uiColors.textSecondary,
-                  height: 20,
-                  fontSize: '10px',
-                }}
-              />
-              <StyledChip 
-                size="small" 
-                label={`연결: ${edges.length}`}
-                sx={{ 
-                  backgroundColor: '#f0f0f0',
-                  color: uiColors.textSecondary,
-                  height: 20,
-                  fontSize: '10px',
-                }}
-              />
-            </Box>
-            
-            {/* 리프 노드 대시보드 */}
-            <LeafNodesDashboard
-              onNodeClick={(nodeId) => {
-                // 노드로 포커스 이동
-                if (reactFlowInstance) {
-                  const node = nodes.find(n => n.id === nodeId)
-                  if (node) {
-                    reactFlowInstance.setCenter(node.position.x + 100, node.position.y + 50, {
-                      duration: 800,
-                      zoom: 1,
-                    })
-                  }
+        <GraphToolbar
+          sessionName={sessionName}
+          updateSessionName={updateSessionName}
+          createNewSession={createNewSession}
+          globalExpanded={globalExpanded}
+          setGlobalExpanded={setGlobalExpanded}
+          leafNodesCount={leafNodesCount}
+          nodeCount={nodes.length}
+          edgeCount={edges.length}
+          collapsed={sessionPanelCollapsed}
+          setCollapsed={setSessionPanelCollapsed}
+        />
+        
+        <Panel position="top-left" style={{ top: sessionPanelCollapsed ? 60 : 120 }}>
+          <LeafNodesDashboard
+            onNodeClick={(nodeId) => {
+              // 노드로 빠른 포커스 이동
+              if (reactFlowInstance) {
+                const node = nodes.find(n => n.id === nodeId)
+                if (node) {
+                  reactFlowInstance.setCenter(node.position.x + 100, node.position.y + 50, {
+                    duration: 200,
+                    zoom: reactFlowInstance.getZoom(),
+                  })
                 }
-              }}
-            />
-          </StyledPanel>
+              }
+            }}
+          />
         </Panel>
       </ReactFlow>
       
@@ -723,6 +691,26 @@ const GraphCanvas: React.FC = () => {
         onCreateReference={handleCreateReference}
         onDelete={handleDeleteNodes}
         onOpenSummaryDialog={handleOpenSummaryDialog}
+        onCreateIndependentNode={async () => {
+          if (typeof createIndependentNode !== 'function') {
+            console.error('[GraphCanvas] createIndependentNode is not a function')
+            return
+          }
+          const newNodeId = await createIndependentNode()
+          setContextMenuPosition(null)
+          // 새 노드로 빠른 포커스 이동
+          setTimeout(() => {
+            if (reactFlowInstance) {
+              const node = nodes.find(n => n.id === newNodeId)
+              if (node) {
+                reactFlowInstance.setCenter(node.position.x + 100, node.position.y + 50, {
+                  duration: 300,
+                  zoom: 1,
+                })
+              }
+            }
+          }, 50)
+        }}
       />
       
       <SummaryDialog

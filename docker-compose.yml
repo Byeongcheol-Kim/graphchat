@@ -1,67 +1,79 @@
 version: '3.8'
 
 services:
-  # FalkorDB (그래프 데이터베이스)
+  # 그래프 데이터베이스
   falkordb:
     image: falkordb/falkordb:latest
-    container_name: branching-ai-falkordb
+    container_name: graphchat-falkordb
     ports:
-      - "6380:6379"
+      - "6432:6379"
     volumes:
       - falkordb_data:/data
-    networks:
-      - branching-network
+    environment:
+      - REDIS_ARGS=--save 60 1 --loglevel warning
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
+      interval: 10s
+      timeout: 5s
       retries: 5
+    networks:
+      - graphchat-network
 
-  # 백엔드 (FastAPI)
+  # 백엔드 서버
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: branching-ai-backend
+    container_name: graphchat-backend
     ports:
-      - "8000:8000"
+      - "8432:8432"
     environment:
       - FALKORDB_HOST=falkordb
-      - FALKORDB_PORT=6379  # 컨테이너 내부 포트는 그대로 6379
-      - DEBUG=true
+      - FALKORDB_PORT=6379
+      - API_HOST=0.0.0.0
+      - API_PORT=8432
+      - CORS_ORIGINS=["http://localhost:3432","http://localhost:3433","http://localhost:3434"]
     env_file:
       - .env
-    volumes:
-      - ./backend:/app
     depends_on:
       falkordb:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8432/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
     networks:
-      - branching-network
-    command: uvicorn app.main:socket_app --host 0.0.0.0 --port 8000 --reload
+      - graphchat-network
+    volumes:
+      - ./backend:/app
+    command: python main.py
 
-  # 프론트엔드 (React)
+  # 프론트엔드 서버
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: branching-ai-frontend
+    container_name: graphchat-frontend
     ports:
-      - "3000:3000"
+      - "3432:3432"
     environment:
-      - VITE_API_URL=http://localhost:8000
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - VITE_API_URL=http://localhost:8432
+      - VITE_WS_URL=ws://localhost:8432
+      - PORT=3432
     depends_on:
       - backend
     networks:
-      - branching-network
+      - graphchat-network
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     command: npm run dev -- --host
-
-networks:
-  branching-network:
-    driver: bridge
 
 volumes:
   falkordb_data:
+    driver: local
+
+networks:
+  graphchat-network:
+    driver: bridge

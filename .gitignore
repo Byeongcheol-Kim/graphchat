@@ -133,3 +133,24 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# UV package manager
+uv.lock
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Claude AI
+.claude/
+
+# Project specific
+결과보고서_*.md
+backend/main_simple.py
+frontend/.env
+frontend/.env.example
+
+# Backup files
+.env.backup

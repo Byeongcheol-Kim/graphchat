@@ -1,0 +1,9 @@
+# 개발 및 테스트 의존성
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+httpx==0.25.2
+websockets==12.0
+ruff==0.1.8
+mypy==1.7.1
+types-redis==4.6.0.11

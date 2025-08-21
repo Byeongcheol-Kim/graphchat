@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 저장소 개요
 
-**branching-ai**는 지능적인 주제 분기와 컨텍스트 관리를 통해 AI 대화를 향상시키는 그래프 기반 사고 분기 시스템입니다. 사용자가 여러 대화 경로를 동시에 탐색하면서도 각 브랜치 간의 컨텍스트와 연결을 유지할 수 있도록 합니다.
+**graphchat**은 지능적인 주제 분기와 컨텍스트 관리를 통해 AI 대화를 향상시키는 그래프 기반 사고 분기 시스템입니다. 사용자가 여러 대화 경로를 동시에 탐색하면서도 각 브랜치 간의 컨텍스트와 연결을 유지할 수 있도록 합니다.
 
 ## 프로젝트 상태
 
@@ -219,3 +219,4 @@ LOG_LEVEL=debug
 2. 분기 에이전트 로직에 추가
 3. API 엔드포인트 생성
 4. 컨텍스트 상태 표시를 위한 UI 업데이트
+- dict 타입 대신 pydantic basemodel 을 사용하는 게 좋을 거 같아. 그리고 @backend/api/endpoints/sessions.py#L134-137 이런 형태의 다른 타입의 데이터를 처리하는건 최대한 지양해줘.

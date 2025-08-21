@@ -3,11 +3,13 @@ import { Handle, Position, NodeProps } from '@xyflow/react'
 
 interface SimpleNodeData {
   label: string
-  type: 'main' | 'topic' | 'exploration' | 'question' | 'solution' | 'merge'
+  type: 'root' | 'main' | 'topic' | 'exploration' | 'question' | 'solution' | 'summary' | 'reference'
   status: 'active' | 'paused' | 'completed'
   messageCount: number
   isAncestor?: boolean
-  isMerge?: boolean
+  isSummary?: boolean
+  isReference?: boolean
+  sourceNodeIds?: string[]
 }
 
 const getNodeStyle = (data: SimpleNodeData, selected: boolean) => {
@@ -17,6 +19,10 @@ const getNodeStyle = (data: SimpleNodeData, selected: boolean) => {
   
   // 타입별 색상
   switch (data.type) {
+    case 'root':
+      backgroundColor = '#64748b'
+      color = '#ffffff'
+      break
     case 'main':
       backgroundColor = '#6366f1'
       color = '#ffffff'
@@ -37,8 +43,12 @@ const getNodeStyle = (data: SimpleNodeData, selected: boolean) => {
       backgroundColor = '#f59e0b'
       color = '#ffffff'
       break
-    case 'merge':
+    case 'summary':
       backgroundColor = '#e91e63'
+      color = '#ffffff'
+      break
+    case 'reference':
+      backgroundColor = '#9333ea'
       color = '#ffffff'
       break
   }
@@ -50,9 +60,9 @@ const getNodeStyle = (data: SimpleNodeData, selected: boolean) => {
     borderColor = '#6366f1'
   }
   
-  // 머지 노드는 특별한 테두리 스타일
-  if (data.isMerge) {
-    borderColor = selected ? '#ff0072' : '#c2185b'
+  // 요약/참조 노드는 특별한 테두리 스타일
+  if (data.isSummary || data.isReference) {
+    borderColor = selected ? '#ff0072' : data.isSummary ? '#c2185b' : '#7c3aed'
   }
   
   // 상태별 투명도
@@ -68,7 +78,7 @@ const getNodeStyle = (data: SimpleNodeData, selected: boolean) => {
     borderColor,
     color,
     opacity,
-    borderWidth: data.isMerge ? 3 : selected ? 3 : data.isAncestor ? 2 : 1,
+    borderWidth: (data.isSummary || data.isReference) ? 3 : selected ? 3 : data.isAncestor ? 2 : 1,
   }
 }
 
@@ -90,12 +100,12 @@ const SimpleNode: React.FC<NodeProps<SimpleNodeData>> = ({ data, selected }) => 
       <div
         style={{
           padding: '10px 15px',
-          borderRadius: data.isMerge ? '12px' : '8px',
+          borderRadius: (data.isSummary || data.isReference) ? '12px' : '8px',
           fontSize: '12px',
           fontWeight: 500,
           backgroundColor: style.backgroundColor,
           border: `${style.borderWidth}px solid ${style.borderColor}`,
-          borderStyle: data.isMerge ? 'dashed' : 'solid',
+          borderStyle: (data.isSummary || data.isReference) ? 'dashed' : 'solid',
           color: style.color,
           opacity: style.opacity,
           minWidth: '150px',
@@ -104,7 +114,7 @@ const SimpleNode: React.FC<NodeProps<SimpleNodeData>> = ({ data, selected }) => 
           position: 'relative',
         }}
       >
-        {data.isMerge && (
+        {data.isSummary && (
           <div style={{
             position: 'absolute',
             top: '-8px',
@@ -116,7 +126,22 @@ const SimpleNode: React.FC<NodeProps<SimpleNodeData>> = ({ data, selected }) => 
             fontWeight: 'bold',
             borderRadius: '4px',
           }}>
-            MERGE
+            SUMMARY
+          </div>
+        )}
+        {data.isReference && (
+          <div style={{
+            position: 'absolute',
+            top: '-8px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: style.backgroundColor,
+            padding: '0 4px',
+            fontSize: '9px',
+            fontWeight: 'bold',
+            borderRadius: '4px',
+          }}>
+            REFERENCE
           </div>
         )}
         <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>

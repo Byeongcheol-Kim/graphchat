@@ -26,7 +26,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 import SearchIcon from '@mui/icons-material/Search'
 import { NodeTypeChip } from '@shared/components'
 import { borderRadius, uiColors, fontSize } from '@shared/theme'
-import { Branch } from '@store/conversationStore'
+import { Node, Branch } from '@/types'
 
 interface SearchResult {
   branch: Branch
@@ -186,7 +186,7 @@ const VectorSearchModal: React.FC<VectorSearchModalProps> = ({
       
       <DialogContent sx={{ p: 0 }}>
         {/* 검색 입력 영역 */}
-        <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+        <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
           <TextField
             fullWidth
             value={searchQuery}
@@ -217,13 +217,14 @@ const VectorSearchModal: React.FC<VectorSearchModalProps> = ({
               },
             }}
           />
-          <Box sx={{ mt: 1.5, display: 'flex', gap: 1 }}>
+          <Box sx={{ mt: 1, display: 'flex', gap: 0.75 }}>
             <Button
               variant="contained"
               onClick={performSearch}
               disabled={!searchQuery.trim() || isSearching}
               startIcon={<SearchIcon />}
-              sx={{ borderRadius: borderRadius.md }}
+              size="small"
+              sx={{ borderRadius: borderRadius.md, py: 0.5, fontSize: '12px' }}
             >
               검색
             </Button>
@@ -235,7 +236,8 @@ const VectorSearchModal: React.FC<VectorSearchModalProps> = ({
                 setHasSearched(false)
               }}
               disabled={isSearching}
-              sx={{ borderRadius: borderRadius.md }}
+              size="small"
+              sx={{ borderRadius: borderRadius.md, py: 0.5, fontSize: '12px' }}
             >
               초기화
             </Button>
@@ -243,8 +245,8 @@ const VectorSearchModal: React.FC<VectorSearchModalProps> = ({
           
           {/* 검색 힌트 */}
           {!hasSearched && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="caption" sx={{ color: uiColors.textMuted, display: 'block', mb: 1 }}>
+            <Box sx={{ mt: 1.5 }}>
+              <Typography variant="caption" sx={{ color: uiColors.textMuted, display: 'block', mb: 0.75, fontSize: '11px' }}>
                 검색 예시:
               </Typography>
               <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
@@ -259,6 +261,8 @@ const VectorSearchModal: React.FC<VectorSearchModalProps> = ({
                     }}
                     sx={{
                       cursor: 'pointer',
+                      height: 24,
+                      '& .MuiChip-label': { fontSize: '11px', px: 1 },
                       '&:hover': {
                         backgroundColor: 'action.hover',
                       },
@@ -274,11 +278,11 @@ const VectorSearchModal: React.FC<VectorSearchModalProps> = ({
         {hasSearched && (
           <List sx={{ p: 0 }}>
             {searchResults.length === 0 ? (
-              <Box sx={{ p: 4, textAlign: 'center' }}>
-                <Typography variant="body2" sx={{ color: uiColors.textMuted, mb: 2 }}>
+              <Box sx={{ p: 3, textAlign: 'center' }}>
+                <Typography variant="body2" sx={{ color: uiColors.textMuted, mb: 1.5, fontSize: '12px' }}>
                   검색 결과가 없습니다
                 </Typography>
-                <Typography variant="caption" sx={{ color: uiColors.textMuted }}>
+                <Typography variant="caption" sx={{ color: uiColors.textMuted, fontSize: '11px' }}>
                   다른 검색어를 시도해보세요
                 </Typography>
               </Box>
@@ -326,8 +330,8 @@ const VectorSearchModal: React.FC<VectorSearchModalProps> = ({
                   >
                     <Box sx={{ width: '100%' }}>
                       {/* 노드 정보 */}
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.75 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '12px' }}>
                           #{index + 1}
                         </Typography>
                         <NodeTypeChip
@@ -353,15 +357,16 @@ const VectorSearchModal: React.FC<VectorSearchModalProps> = ({
                         variant="body2" 
                         sx={{ 
                           color: uiColors.textSecondary,
-                          mb: 1,
+                          mb: 0.75,
+                          fontSize: '11px',
                         }}
                       >
                         {result.branch.summary || result.branch.description}
                       </Typography>
                       
                       {/* 유사도 바 */}
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="caption" sx={{ color: uiColors.textMuted, minWidth: 50 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        <Typography variant="caption" sx={{ color: uiColors.textMuted, minWidth: 40, fontSize: '10px' }}>
                           유사도
                         </Typography>
                         <LinearProgress
@@ -369,7 +374,7 @@ const VectorSearchModal: React.FC<VectorSearchModalProps> = ({
                           value={result.similarity * 100}
                           sx={{
                             flexGrow: 1,
-                            height: 6,
+                            height: 4,
                             borderRadius: borderRadius.xs,
                             backgroundColor: '#e5e7eb',
                             '& .MuiLinearProgress-bar': {
@@ -384,26 +389,26 @@ const VectorSearchModal: React.FC<VectorSearchModalProps> = ({
                 
                 {/* 확장된 내용 */}
                 <Collapse in={isExpanded}>
-                  <Box sx={{ px: 3, pb: 2 }}>
+                  <Box sx={{ px: 2.5, pb: 1.5 }}>
                     {/* 하이라이트된 텍스트 */}
                     {result.highlights.length > 0 && (
                       <Box sx={{ mb: 2 }}>
-                        <Typography variant="caption" sx={{ color: uiColors.textMuted, fontWeight: 600 }}>
+                        <Typography variant="caption" sx={{ color: uiColors.textMuted, fontWeight: 600, fontSize: '10px' }}>
                           관련 내용:
                         </Typography>
-                        <Box sx={{ mt: 1 }}>
+                        <Box sx={{ mt: 0.75 }}>
                           {result.highlights.map((highlight, idx) => (
                             <Paper
                               key={idx}
                               sx={{
-                                p: 1.5,
-                                mb: 1,
+                                p: 1,
+                                mb: 0.75,
                                 backgroundColor: 'grey.50',
                                 borderLeft: '3px solid',
                                 borderColor: getSimilarityColor(result.similarity),
                               }}
                             >
-                              <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
+                              <Typography variant="body2" sx={{ fontStyle: 'italic', fontSize: '11px' }}>
                                 "{highlight}"
                               </Typography>
                             </Paper>
@@ -415,7 +420,7 @@ const VectorSearchModal: React.FC<VectorSearchModalProps> = ({
                     {/* 주요 포인트 */}
                     {result.branch.keyPoints && result.branch.keyPoints.length > 0 && (
                       <Box>
-                        <Typography variant="caption" sx={{ color: uiColors.textMuted, fontWeight: 600 }}>
+                        <Typography variant="caption" sx={{ color: uiColors.textMuted, fontWeight: 600, fontSize: '10px' }}>
                           주요 포인트:
                         </Typography>
                         <Box sx={{ mt: 0.5 }}>
@@ -424,7 +429,7 @@ const VectorSearchModal: React.FC<VectorSearchModalProps> = ({
                               key={idx}
                               label={point}
                               size="small"
-                              sx={{ mr: 0.5, mb: 0.5 }}
+                              sx={{ mr: 0.5, mb: 0.5, height: 22, '& .MuiChip-label': { fontSize: '10px', px: 0.75 } }}
                             />
                           ))}
                         </Box>
@@ -432,16 +437,16 @@ const VectorSearchModal: React.FC<VectorSearchModalProps> = ({
                     )}
                     
                     {/* 메타데이터 */}
-                    <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
-                      <Typography variant="caption" sx={{ color: uiColors.textMuted }}>
+                    <Box sx={{ mt: 1.5, display: 'flex', gap: 1.5 }}>
+                      <Typography variant="caption" sx={{ color: uiColors.textMuted, fontSize: '10px' }}>
                         메시지: {result.branch.messages.length}개
                       </Typography>
                       {result.branch.tokenCount && (
-                        <Typography variant="caption" sx={{ color: uiColors.textMuted }}>
+                        <Typography variant="caption" sx={{ color: uiColors.textMuted, fontSize: '10px' }}>
                           토큰: {result.branch.tokenCount}
                         </Typography>
                       )}
-                      <Typography variant="caption" sx={{ color: uiColors.textMuted }}>
+                      <Typography variant="caption" sx={{ color: uiColors.textMuted, fontSize: '10px' }}>
                         깊이: {result.branch.depth}
                       </Typography>
                     </Box>
@@ -457,7 +462,7 @@ const VectorSearchModal: React.FC<VectorSearchModalProps> = ({
       {/* 액션 버튼 */}
       {hasSearched && selectedNodes.size > 0 && (
         <Box sx={{ 
-          p: 2, 
+          p: 1.5, 
           borderTop: '1px solid',
           borderColor: 'divider',
           display: 'flex',
@@ -467,14 +472,14 @@ const VectorSearchModal: React.FC<VectorSearchModalProps> = ({
           bottom: 0,
           backgroundColor: 'background.paper',
         }}>
-          <Typography variant="body2" sx={{ color: uiColors.textSecondary }}>
+          <Typography variant="body2" sx={{ color: uiColors.textSecondary, fontSize: '12px' }}>
             {selectedNodes.size}개 노드 선택됨
           </Typography>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button variant="outlined" onClick={() => setSelectedNodes(new Set())}>
+          <Box sx={{ display: 'flex', gap: 0.75 }}>
+            <Button variant="outlined" size="small" onClick={() => setSelectedNodes(new Set())} sx={{ fontSize: '12px', py: 0.5 }}>
               선택 취소
             </Button>
-            <Button variant="contained" onClick={handleApplySelection}>
+            <Button variant="contained" size="small" onClick={handleApplySelection} sx={{ fontSize: '12px', py: 0.5 }}>
               {selectedNodes.size > 1 ? '선택한 노드 요약 생성' : '선택한 노드로 이동'}
             </Button>
           </Box>

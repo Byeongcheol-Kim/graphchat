@@ -2,24 +2,32 @@ import React, { useState } from 'react'
 import {
   IconButton,
   Menu,
-  MenuItem,
-  ListItemIcon,
-  ListItemText,
-  Divider,
   Box,
   Typography,
   ToggleButtonGroup,
   ToggleButton,
   Switch,
   Tooltip,
+  Select,
+  FormControl,
 } from '@mui/material'
 import SettingsIcon from '@mui/icons-material/Settings'
 import DarkModeIcon from '@mui/icons-material/DarkMode'
 import LightModeIcon from '@mui/icons-material/LightMode'
-import TextFieldsIcon from '@mui/icons-material/TextFields'
 import FormatSizeIcon from '@mui/icons-material/FormatSize'
+import PaletteIcon from '@mui/icons-material/Palette'
 import { borderRadius, uiColors } from '@shared/theme'
+import { ColorTheme } from '@shared/theme/colors'
 import { useConversationStore } from '@store/conversationStore'
+import { SettingSection } from './settings/SettingSection'
+import { ThemeOption } from './settings/ThemeOption'
+import { themeConfigs } from './settings/themeConfig'
+
+const FONT_SIZE_MAP = {
+  small: '12px',
+  medium: '14px',
+  large: '16px',
+} as const
 
 const SettingsMenu: React.FC = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
@@ -44,15 +52,6 @@ const SettingsMenu: React.FC = () => {
   
   const handleDarkModeToggle = () => {
     updateSettings({ darkMode: !settings.darkMode })
-  }
-  
-  const getFontSizeValue = () => {
-    switch (settings.fontSize) {
-      case 'small': return '12px'
-      case 'medium': return '14px'
-      case 'large': return '16px'
-      default: return '14px'
-    }
   }
   
   return (
@@ -88,36 +87,25 @@ const SettingsMenu: React.FC = () => {
         }}
       >
         {/* 다크 모드 토글 */}
-        <Box sx={{ px: 2, py: 1.5 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              {settings.darkMode ? <DarkModeIcon fontSize="small" /> : <LightModeIcon fontSize="small" />}
-              <Typography variant="body2">
-                다크 모드
-              </Typography>
-            </Box>
+        <SettingSection
+          icon={settings.darkMode ? <DarkModeIcon fontSize="small" /> : <LightModeIcon fontSize="small" />}
+          title="다크 모드"
+        >
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: -3 }}>
             <Switch
               checked={settings.darkMode}
               onChange={handleDarkModeToggle}
               size="small"
             />
           </Box>
-        </Box>
-        
-        <Divider sx={{ my: 0.5 }} />
+        </SettingSection>
         
         {/* 글자 크기 설정 */}
-        <Box sx={{ px: 2, py: 1.5 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
-            <FormatSizeIcon fontSize="small" />
-            <Typography variant="body2">
-              글자 크기
-            </Typography>
-            <Typography variant="caption" sx={{ ml: 'auto', color: uiColors.textMuted }}>
-              {getFontSizeValue()}
-            </Typography>
-          </Box>
-          
+        <SettingSection
+          icon={<FormatSizeIcon fontSize="small" />}
+          title="글자 크기"
+          subtitle={FONT_SIZE_MAP[settings.fontSize]}
+        >
           <ToggleButtonGroup
             value={settings.fontSize}
             exclusive
@@ -142,9 +130,36 @@ const SettingsMenu: React.FC = () => {
               <Typography variant="subtitle2">크게</Typography>
             </ToggleButton>
           </ToggleButtonGroup>
-        </Box>
+        </SettingSection>
         
-        <Divider sx={{ my: 0.5 }} />
+        {/* 색상 테마 설정 */}
+        <SettingSection
+          icon={<PaletteIcon fontSize="small" />}
+          title="색상 테마"
+        >
+          <FormControl fullWidth size="small">
+            <Select
+              value={settings.colorTheme}
+              onChange={(e) => updateSettings({ colorTheme: e.target.value as ColorTheme })}
+              sx={{
+                borderRadius: borderRadius.sm,
+                fontSize: '0.875rem',
+                '& .MuiSelect-select': {
+                  py: 0.75,
+                },
+              }}
+            >
+              {themeConfigs.map((theme) => (
+                <ThemeOption
+                  key={theme.value}
+                  value={theme.value}
+                  label={theme.label}
+                  colors={theme.colors}
+                />
+              ))}
+            </Select>
+          </FormControl>
+        </SettingSection>
         
         {/* 추가 설정 정보 */}
         <Box sx={{ px: 2, py: 1, opacity: 0.7 }}>

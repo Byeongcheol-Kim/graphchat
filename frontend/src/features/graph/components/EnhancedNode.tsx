@@ -10,13 +10,16 @@ import {
   Search,
   HelpCircle,
   Lightbulb,
-  Activity
+  Activity,
+  Home,
+  Link2
 } from 'lucide-react'
-import { getNodeTypeColor, getStatusColor, borderRadius, shadows, fontSize } from '@shared/theme'
+import { getStatusColor, borderRadius, shadows, fontSize } from '@shared/theme'
+import { useThemeColor } from '@shared/hooks/useThemeColor'
 
 interface EnhancedNodeData {
   label: string
-  type: 'main' | 'topic' | 'exploration' | 'question' | 'solution' | 'merge'
+  type: 'root' | 'main' | 'topic' | 'exploration' | 'question' | 'solution' | 'summary' | 'reference'
   status: 'active' | 'paused' | 'completed'
   messageCount: number
   tokenCount?: number
@@ -25,23 +28,28 @@ interface EnhancedNodeData {
   charts?: { type: 'flow' | 'table' | 'list'; content: any }[]
   isAncestor?: boolean
   isMerge?: boolean
+  isSummary?: boolean
+  isReference?: boolean
   globalExpanded?: boolean
   isIndividualExpanded?: boolean
   isMultiSelected?: boolean
   isRelatedToSelectedMerge?: boolean
   parentIds?: string[]
+  sourceNodeIds?: string[]
   onExpandToggle?: (nodeId: string, expanded: boolean) => void
 }
 
 const getTypeIcon = (type: string) => {
   const iconProps = { size: 14, color: 'white' }
   switch (type) {
+    case 'root': return <Home {...iconProps} />
     case 'main': return <Activity {...iconProps} />
     case 'topic': return <Brain {...iconProps} />
     case 'exploration': return <Search {...iconProps} />
     case 'question': return <HelpCircle {...iconProps} />
     case 'solution': return <Lightbulb {...iconProps} />
-    case 'merge': return <GitMerge {...iconProps} />
+    case 'summary': return <GitMerge {...iconProps} />
+    case 'reference': return <Link2 {...iconProps} />
     default: return <MessageSquare {...iconProps} />
   }
 }
@@ -69,10 +77,11 @@ const formatTokenCount = (count?: number) => {
 const EnhancedNode: React.FC<NodeProps> = ({ data, selected, id }) => {
   const nodeData = data as EnhancedNodeData
   const [localExpanded, setLocalExpanded] = useState(nodeData.isIndividualExpanded || false)
+  const { getNodeTypeColor } = useThemeColor()
   const typeColor = getNodeTypeColor(nodeData.type)
   
-  // 전체 확장 상태가 있으면 그것을 우선시, 없으면 개별 상태 사용
-  const isExpanded = nodeData.globalExpanded ?? localExpanded
+  // 전체 확장과 개별 확장 중 하나라도 true면 확장
+  const isExpanded = nodeData.globalExpanded || localExpanded
   
   // props가 변경되면 로컬 상태 업데이트
   useEffect(() => {
@@ -82,7 +91,7 @@ const EnhancedNode: React.FC<NodeProps> = ({ data, selected, id }) => {
   const borderStyle = {
     borderWidth: selected ? 3 : nodeData.isRelatedToSelectedMerge ? 2.5 : nodeData.isMultiSelected ? 2.5 : nodeData.isAncestor ? 2 : 1,
     borderColor: selected ? '#ff0072' : nodeData.isRelatedToSelectedMerge ? '#10b981' : nodeData.isMultiSelected ? '#3b82f6' : nodeData.isAncestor ? typeColor : '#e5e7eb',
-    borderStyle: nodeData.isMerge ? 'dashed' : 'solid',
+    borderStyle: (nodeData.isSummary || nodeData.isReference) ? 'dashed' : 'solid',
   }
 
   return (
@@ -114,7 +123,7 @@ const EnhancedNode: React.FC<NodeProps> = ({ data, selected, id }) => {
           overflow: 'hidden',
           minWidth: isExpanded ? '240px' : '180px',
           maxWidth: isExpanded ? '300px' : '200px',
-          transition: 'all 0.3s ease',
+          transition: 'min-width 0.2s ease, max-width 0.2s ease, box-shadow 0.15s ease',
           ...borderStyle,
         }}
       >
@@ -176,13 +185,13 @@ const EnhancedNode: React.FC<NodeProps> = ({ data, selected, id }) => {
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                color: nodeData.globalExpanded ? '#6366f1' : '#94a3b8',
+                color: localExpanded ? '#6366f1' : '#94a3b8',
                 padding: '0',
-                opacity: nodeData.globalExpanded ? 0.5 : 1,
+                transition: 'color 0.1s',
               }}
-              title={nodeData.globalExpanded ? "전체 확장 모드 활성화됨" : "개별 확장/축소"}
+              title={localExpanded ? "축소" : "확장"}
             >
-              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              {localExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             </button>
           </div>
 

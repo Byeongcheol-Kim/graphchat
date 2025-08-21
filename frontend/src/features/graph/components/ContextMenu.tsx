@@ -5,6 +5,7 @@ import AccountTreeIcon from '@mui/icons-material/AccountTree'
 import SummarizeIcon from '@mui/icons-material/Summarize'
 import DeleteIcon from '@mui/icons-material/Delete'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+import AddCircleIcon from '@mui/icons-material/AddCircle'
 
 interface ContextMenuProps {
   position: { x: number; y: number } | null
@@ -14,6 +15,7 @@ interface ContextMenuProps {
   onCreateReference: () => void
   onDelete: () => void
   onOpenSummaryDialog?: () => void
+  onCreateIndependentNode?: () => void
 }
 
 const ContextMenu: React.FC<ContextMenuProps> = ({
@@ -24,9 +26,11 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
   onCreateReference,
   onDelete,
   onOpenSummaryDialog,
+  onCreateIndependentNode,
 }) => {
   const isMultiSelect = selectedNodes.length > 1
   const canCreateNodes = selectedNodes.length > 0
+  const isEmpty = selectedNodes.length === 0
 
   return (
     <Menu
@@ -80,6 +84,18 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
           </MenuItem>
           <Divider />
         </>
+      )}
+      
+      {isEmpty && onCreateIndependentNode && (
+        <MenuItem onClick={onCreateIndependentNode}>
+          <ListItemIcon>
+            <AddCircleIcon fontSize="small" sx={{ color: 'primary.main' }} />
+          </ListItemIcon>
+          <ListItemText 
+            primary="새 시작 노드" 
+            secondary="독립적인 대화 시작"
+          />
+        </MenuItem>
       )}
       
       {canCreateNodes && (

@@ -1,11 +1,7 @@
-import React, { useState, useMemo } from 'react'
+import React, { useMemo, useCallback } from 'react'
 import {
   Box,
-  Paper,
   Typography,
-  IconButton,
-  Chip,
-  Tooltip,
   Badge,
   Accordion,
   AccordionSummary,
@@ -13,32 +9,34 @@ import {
 } from '@mui/material'
 import DashboardIcon from '@mui/icons-material/Dashboard'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
-import ViewCompactIcon from '@mui/icons-material/ViewCompact'
-import ViewStreamIcon from '@mui/icons-material/ViewStream'
-import { useConversationStore, Branch } from '@store/conversationStore'
-import { borderRadius, uiColors, getNodeTypeColor } from '@shared/theme'
-import { NodeTypeChip } from '@shared/components'
+import { useConversationStore } from '@store/conversationStore'
+import { borderRadius, uiColors } from '@shared/theme'
+import { useThemeColor } from '@shared/hooks/useThemeColor'
+import LeafNodeItem from './LeafNodeItem'
 
 interface LeafNodesDashboardProps {
   onNodeClick: (nodeId: string) => void
 }
 
-const LeafNodesDashboard: React.FC<LeafNodesDashboardProps> = ({
+const LeafNodesDashboard: React.FC<LeafNodesDashboardProps> = React.memo(({
   onNodeClick,
 }) => {
   const { branches, currentBranchId, switchBranch } = useConversationStore()
-  const [isCompact, setIsCompact] = useState(false)
+  const { getNodeTypeColor } = useThemeColor()
 
-  // 리프 노드 필터링 (완료된 노드 제외, 머지 노드 포함)
+  // 리프 노드 필터링 (완료된 노드 제외, 요약 노드 포함)
   const leafNodes = useMemo(() => {
     // 모든 노드의 자식 찾기
     const hasChildren = new Set<string>()
     branches.forEach(branch => {
+      // 일반 부모 체크
       if (branch.parentId) {
         hasChildren.add(branch.parentId)
       }
-      if (branch.parentIds) {
-        branch.parentIds.forEach(id => hasChildren.add(id))
+      // 요약 노드의 소스들 체크 (parentIds 또는 sourceNodeIds)
+      const sourceIds = (branch as any).sourceNodeIds || (branch as any).parentIds
+      if (sourceIds) {
+        sourceIds.forEach(id => hasChildren.add(id))
       }
     })
 
@@ -54,48 +52,67 @@ const LeafNodesDashboard: React.FC<LeafNodesDashboardProps> = ({
     }).sort((a, b) => {
       // 깊이로 정렬, 같은 깊이면 최근 업데이트 순
       if (a.depth !== b.depth) return b.depth - a.depth
-      const aTime = a.updatedAt?.getTime() || a.createdAt?.getTime() || 0
-      const bTime = b.updatedAt?.getTime() || b.createdAt?.getTime() || 0
+      
+      // Date 객체로 변환
+      const getTimeValue = (date: any) => {
+        if (!date) return 0
+        if (date instanceof Date) return date.getTime()
+        if (typeof date === 'string') return new Date(date).getTime()
+        return 0
+      }
+      
+      const aTime = getTimeValue(a.updatedAt) || getTimeValue(a.createdAt) || 0
+      const bTime = getTimeValue(b.updatedAt) || getTimeValue(b.createdAt) || 0
       return bTime - aTime
     })
   }, [branches])
 
-  const handleNodeClick = (nodeId: string) => {
+  const handleNodeClick = useCallback((nodeId: string) => {
     switchBranch(nodeId)
     onNodeClick(nodeId)
-  }
+  }, [switchBranch, onNodeClick])
 
   return (
     <Accordion 
       sx={{ 
-        backgroundColor: 'background.paper',
-        borderRadius: borderRadius.md,
+        backgroundColor: uiColors.backgroundPrimary,
+        borderRadius: '12px',
         '&:before': { display: 'none' },
-        boxShadow: 'none',
-        border: '1px solid',
-        borderColor: 'divider',
-        mt: 1,
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+        border: `1px solid ${uiColors.borderLight}`,
+        mt: 0.5,
+        minWidth: 280,
+        width: 280,
       }}
     >
       <AccordionSummary
-        expandIcon={<ExpandMoreIcon />}
+        expandIcon={<ExpandMoreIcon sx={{ fontSize: '16px' }} />}
         sx={{
-          minHeight: 48,
+          minHeight: '36px !important',
+          backgroundColor: uiColors.backgroundSecondary,
+          borderRadius: '12px',
+          '&.Mui-expanded': {
+            minHeight: '36px',
+            borderRadius: '12px 12px 0 0',
+          },
           '& .MuiAccordionSummary-content': {
-            margin: '8px 0',
+            margin: '6px 0',
+            '&.Mui-expanded': {
+              margin: '6px 0',
+            },
           },
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-          <DashboardIcon fontSize="small" sx={{ color: 'primary.main' }} />
-          <Typography variant="subtitle2" sx={{ fontWeight: 600, flexGrow: 1 }}>
+          <DashboardIcon sx={{ color: getNodeTypeColor('main'), fontSize: '16px' }} />
+          <Typography sx={{ fontWeight: 600, flexGrow: 1, fontSize: '12px' }}>
             활성 리프 노드
           </Typography>
           <Badge 
             badgeContent={leafNodes.length} 
             color="error"
             sx={{
-              mr: 1,
+              mr: 1.5,
               '& .MuiBadge-badge': {
                 fontSize: '10px',
                 height: 16,
@@ -108,182 +125,33 @@ const LeafNodesDashboard: React.FC<LeafNodesDashboardProps> = ({
         </Box>
       </AccordionSummary>
       
-      <AccordionDetails sx={{ p: 0 }}>
-        {/* 컴팩트 토글 */}
-        <Box sx={{ px: 2, pt: 1, pb: 0.5, display: 'flex', justifyContent: 'flex-end' }}>
-          <Tooltip title={isCompact ? "확장 보기" : "컴팩트 보기"}>
-            <IconButton
-              size="small"
-              onClick={() => setIsCompact(!isCompact)}
-              sx={{ p: 0.5 }}
-            >
-              {isCompact ? <ViewStreamIcon sx={{ fontSize: 16 }} /> : <ViewCompactIcon sx={{ fontSize: 16 }} />}
-            </IconButton>
-          </Tooltip>
-        </Box>
-        
+      <AccordionDetails sx={{ p: 0, borderRadius: '0 0 12px 12px' }}>
         {/* 노드 리스트 */}
         <Box
           sx={{
-            maxHeight: 400,
+            maxHeight: 260,
             overflow: 'auto',
-            px: 2,
-            pb: 2,
+            px: 0.75,
+            py: 0.75,
           }}
         >
         {leafNodes.length === 0 ? (
-          <Box sx={{ textAlign: 'center', py: 4 }}>
-            <Typography variant="body2" sx={{ color: uiColors.textMuted }}>
+          <Box sx={{ textAlign: 'center', py: 1.5 }}>
+            <Typography sx={{ color: uiColors.textMuted, fontSize: '11px' }}>
               활성 리프 노드가 없습니다
             </Typography>
           </Box>
         ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            {leafNodes.map((node) => {
-              const isCurrent = node.id === currentBranchId
-              
-              return (
-                <Paper
-                  key={node.id}
-                  elevation={isCurrent ? 2 : 0}
-                  onClick={() => handleNodeClick(node.id)}
-                  sx={{
-                    p: isCompact ? 0.75 : 1,
-                    borderRadius: borderRadius.md,
-                    border: '1px solid',
-                    borderColor: isCurrent ? 'primary.main' : 'divider',
-                    backgroundColor: isCurrent ? 'action.selected' : 'background.paper',
-                    transition: 'all 0.2s ease',
-                    cursor: 'pointer',
-                    '&:hover': {
-                      borderColor: 'primary.light',
-                      transform: 'translateY(-1px)',
-                      boxShadow: 1,
-                      backgroundColor: isCurrent ? 'action.selected' : 'action.hover',
-                    },
-                  }}
-                >
-                  {/* 노드 헤더 */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography 
-                      variant="body2" 
-                      sx={{ 
-                        fontWeight: 500,
-                        fontSize: isCompact ? '0.75rem' : '0.8rem',
-                        color: isCurrent ? 'primary.main' : 'text.primary'
-                      }}
-                    >
-                      {node.title}
-                    </Typography>
-                    {isCurrent && (
-                      <Chip
-                        label="현재"
-                        size="small"
-                        color="primary"
-                        sx={{ height: 20, fontSize: '10px' }}
-                      />
-                    )}
-                  </Box>
-
-                  {/* 컴팩트 모드: 기본 정보만 */}
-                  {isCompact && (
-                    <Box sx={{ mt: 0.5, display: 'flex', gap: 0.5, alignItems: 'center' }}>
-                      <Chip
-                        label={node.type === 'merge' ? '머지' : node.type}
-                        size="small"
-                        sx={{ 
-                          height: 16, 
-                          fontSize: '9px',
-                          backgroundColor: `${getNodeTypeColor(node.type)}20`,
-                          color: getNodeTypeColor(node.type),
-                        }}
-                      />
-                      <Typography variant="caption" sx={{ fontSize: '10px', color: 'text.secondary' }}>
-                        M{node.messages.length} • D{node.depth}
-                      </Typography>
-                      {node.status === 'paused' && (
-                        <Chip
-                          label="⏸"
-                          size="small"
-                          sx={{ height: 16, fontSize: '10px', minWidth: 20 }}
-                        />
-                      )}
-                    </Box>
-                  )}
-
-                  {/* 확장 모드: 상세 정보 */}
-                  {!isCompact && (
-                    <>
-                      {/* 타입과 상태 */}
-                      <Box sx={{ mt: 0.75, display: 'flex', gap: 0.5, alignItems: 'center' }}>
-                        <Chip
-                          label={node.type === 'merge' ? '머지' : node.type}
-                          size="small"
-                          sx={{ 
-                            height: 18, 
-                            fontSize: '10px',
-                            backgroundColor: `${getNodeTypeColor(node.type)}20`,
-                            color: getNodeTypeColor(node.type),
-                          }}
-                        />
-                        <Typography variant="caption" sx={{ fontSize: '11px', color: 'text.secondary' }}>
-                          메시지 {node.messages.length} • 깊이 {node.depth}
-                          {node.tokenCount ? ` • ${node.tokenCount}토큰` : ''}
-                        </Typography>
-                        {node.status === 'paused' && (
-                          <Chip
-                            label="일시정지"
-                            size="small"
-                            color="warning"
-                            sx={{ height: 18, fontSize: '10px' }}
-                          />
-                        )}
-                      </Box>
-
-                      {/* 요약 또는 설명 */}
-                      {(node.summary || node.description) && (
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            mt: 1,
-                            color: uiColors.textSecondary,
-                            fontSize: '0.75rem',
-                            lineHeight: 1.4,
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        >
-                          {node.summary || node.description}
-                        </Typography>
-                      )}
-                      
-                      {/* 주요 포인트 */}
-                      {node.keyPoints && node.keyPoints.length > 0 && (
-                        <Box sx={{ mt: 1 }}>
-                          <Box sx={{ display: 'flex', gap: 0.25, flexWrap: 'wrap' }}>
-                            {node.keyPoints.slice(0, 3).map((point, idx) => (
-                              <Chip
-                                key={idx}
-                                label={point}
-                                size="small"
-                                sx={{
-                                  backgroundColor: 'action.hover',
-                                  fontSize: '10px',
-                                  height: 18,
-                                }}
-                              />
-                            ))}
-                          </Box>
-                        </Box>
-                      )}
-                    </>
-                  )}
-                </Paper>
-              )
-            })}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            {leafNodes.map((node) => (
+              <LeafNodeItem
+                key={node.id}
+                node={node}
+                isCurrent={node.id === currentBranchId}
+                getNodeTypeColor={getNodeTypeColor}
+                onClick={handleNodeClick}
+              />
+            ))}
           </Box>
         )}
         </Box>
@@ -291,19 +159,22 @@ const LeafNodesDashboard: React.FC<LeafNodesDashboardProps> = ({
         {/* 푸터 */}
         <Box
           sx={{
-            p: 1.5,
-            borderTop: '1px solid',
-            borderColor: 'divider',
-            backgroundColor: 'grey.50',
+            px: 1,
+            py: 0.5,
+            borderTop: `1px solid ${uiColors.borderLight}`,
+            backgroundColor: uiColors.backgroundSecondary,
+            borderRadius: '0 0 12px 12px',
           }}
         >
-          <Typography variant="caption" sx={{ color: uiColors.textMuted }}>
-            총 {leafNodes.length}개의 활성 브랜치 • {leafNodes.filter(n => n.status === 'active').length}개 진행 중 • {leafNodes.filter(n => n.isMerge).length}개 머지
+          <Typography sx={{ color: uiColors.textMuted, fontSize: '10px' }}>
+            총 {leafNodes.length}개 • 진행 {leafNodes.filter(n => n.status === 'active').length}개 • 머지 {leafNodes.filter(n => n.isMerge).length}개
           </Typography>
         </Box>
       </AccordionDetails>
     </Accordion>
   )
-}
+})
+
+LeafNodesDashboard.displayName = 'LeafNodesDashboard'
 
 export default LeafNodesDashboard

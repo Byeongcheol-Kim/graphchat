@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
   Dialog,
   DialogTitle,
@@ -9,18 +9,20 @@ import {
   Box,
   Chip,
   Alert,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material'
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever'
 import WarningIcon from '@mui/icons-material/Warning'
 import { borderRadius, uiColors } from '@shared/theme'
-import { Branch } from '@store/conversationStore'
+import { Node } from '@/types'
 
 interface DeleteConfirmDialogProps {
   open: boolean
   onClose: () => void
-  onConfirm: () => void
+  onConfirm: (includeDescendants: boolean) => void
   selectedNodes: string[]
-  branches: Branch[]
+  branches: Node[]
 }
 
 const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
@@ -30,6 +32,8 @@ const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
   selectedNodes,
   branches,
 }) => {
+  const [includeDescendants, setIncludeDescendants] = useState(true)
+  
   // 선택된 노드들과 그 자손들 찾기
   const getDescendants = (nodeId: string): Set<string> => {
     const descendants = new Set<string>()
@@ -41,7 +45,9 @@ const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
       
       // 현재 노드의 자식들 찾기
       const children = branches.filter(b => 
-        b.parentId === currentId || b.parentIds?.includes(currentId)
+        b.parentId === currentId || 
+        (b as any).parentIds?.includes(currentId) ||
+        (b as any).sourceNodeIds?.includes(currentId)
       )
       
       children.forEach(child => {
@@ -125,20 +131,35 @@ const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
         </Box>
         
         {descendantCount > 0 && (
-          <Box sx={{ 
-            p: 2, 
-            backgroundColor: 'error.50',
-            borderRadius: borderRadius.md,
-            border: '1px solid',
-            borderColor: 'error.200',
-          }}>
-            <Typography variant="body2" sx={{ color: 'error.main', fontWeight: 600 }}>
-              ⚠️ 함께 삭제될 하위 노드: {descendantCount}개
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'error.dark', display: 'block', mt: 0.5 }}>
-              총 {allNodesToDelete.size}개의 노드가 삭제됩니다
-            </Typography>
-          </Box>
+          <>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={includeDescendants}
+                  onChange={(e) => setIncludeDescendants(e.target.checked)}
+                />
+              }
+              label="하위 노드 포함 삭제"
+              sx={{ mt: 2, mb: 1 }}
+            />
+            
+            {includeDescendants && (
+              <Box sx={{ 
+                p: 2, 
+                backgroundColor: 'error.50',
+                borderRadius: borderRadius.md,
+                border: '1px solid',
+                borderColor: 'error.200',
+              }}>
+                <Typography variant="body2" sx={{ color: 'error.main', fontWeight: 600 }}>
+                  ⚠️ 함께 삭제될 하위 노드: {descendantCount}개
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'error.dark', display: 'block', mt: 0.5 }}>
+                  총 {allNodesToDelete.size}개의 노드가 삭제됩니다
+                </Typography>
+              </Box>
+            )}
+          </>
         )}
         
         <Typography variant="body2" sx={{ mt: 2, color: uiColors.textSecondary }}>
@@ -156,7 +177,7 @@ const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
         </Button>
         <Button 
           onClick={() => {
-            onConfirm()
+            onConfirm(includeDescendants)
             onClose()
           }}
           variant="contained"
@@ -164,7 +185,7 @@ const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
           startIcon={<DeleteForeverIcon />}
           sx={{ borderRadius: borderRadius.md }}
         >
-          {descendantCount > 0 ? '모두 삭제' : '삭제'}
+          {descendantCount > 0 && includeDescendants ? '모두 삭제' : '삭제'}
         </Button>
       </DialogActions>
     </Dialog>
