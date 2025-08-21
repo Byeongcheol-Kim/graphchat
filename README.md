@@ -2,10 +2,10 @@
 
 지능적인 주제 분기와 컨텍스트 관리를 통해 AI 대화를 향상시키는 그래프 기반 사고 분기 시스템
 
-s[![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-18.3+-61DAFB.svg)](https://reactjs.org/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
 ## 📋 프로젝트 개요
 
@@ -203,7 +203,7 @@ python scripts/test_llm_branching.py
 
 ## 📝 라이선스
 
-MIT License
+AGPL-3.0 License
 
 ## 🤝 기여
 
